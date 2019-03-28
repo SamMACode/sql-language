@@ -139,6 +139,7 @@ create table student_club (
   club_name varchar(200),
   main_club_flag boolean
 )charset=utf8;
+
 # init student_club data
 insert into student_club values(100, 1, '棒球', true),
   (100, 2, '管弦乐', false), (200, 2, '管弦乐', false),
