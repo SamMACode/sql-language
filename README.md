@@ -2,7 +2,7 @@
 
 学习`SQL`进阶的一些语法，提升自己的`SQL`基础知识和技能。`SQL`语法较为通用，在后续学习`Spark SQL`、`Hive SQL`时会使用到。
 
-### 1. CASE表达式使用
+### 1. CASE表达式
 
 > 在`SQL`里表达式条件分支：`CASE`表达式是`SQL`里非常重要而且使用起来非常便利的技术，我们应学会用其来描述条件分支。可用于行列转换、已有数据重分组（分类）、与约束的结合使用、针对聚合结果的条件分支等。
 
@@ -84,6 +84,46 @@ select std_id,
 		 else max (case when main_club_flag = 'Y' then club_id else null end)
 	end as main_club 
 	from StudentClub group by std_id;
+```
+
+### 2.自连接的用法
+>`SQL`通常在不同的表或者视图间进行连接运算，但是也可以对相同的表进行”自连接“运算。自连接的处理过程不太容易想象，因此人们常常对其敬而远之。但是，如果能够熟练掌握，就会发现它是非常方便的技术。
+
+| name（商品名称） | price（商品价格）     |
+| ---------------- | --------------------- |
+| apple            | 50                    |
+| banana           | 100                   |
+| cherry           | 80                    |
+| cherry           | 80（用于去重SQL语法） |
+
+若要对`fruits`表进行任意排序，生成其对应的笛卡尔积，`3 * 3 = 9`也就是`9`种排列组合的结果：
+
+```sql
+select f1.name as name_1, f2.name as name_2 from fruits f1, fruits f2
+```
+
+当要排除一个重复组合`apple apple`、以及只出现一次的重复组合`apple banana`和`banana apple`：
+
+```sql
+select f1.name as name_1, f2.name as name_2 from fruits f1, fruits f2 
+	where f1.name > f2.name
+```
+
+使用关联子查询删除重复行的方法，当重复的列里不包含主键时就可以使用主键进行处理。但当存在所有列都重复时，则需要使用数据库独立实现的行`ID`，这里的行`ID`可以理解成拥有“任何表都可以使用的主键”这种特征的虚拟列（如`oracle`数据库的`rowid`）：
+
+```sql
+delete from fruits f1 where rowid < (
+    select max(f2.rowid) from fruits f2 where p1.name = p2.name and p1.price = p2.price
+)
+```
+
+或者使用非等值连接删除重复行的`SQL`:
+
+```sql
+delete from fruits f1 where exists (
+	select * from fruits f2 where f1.name = f2.name and f1.price = f2.price 
+    	and f1.rowid < f2.rowid  
+)
 ```
 
 
