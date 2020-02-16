@@ -151,3 +151,19 @@ select p1.name, p1.price,
 	group by p1.name order by rank_1; 
 ```
 
+关于编写`SQL`时`Null`和三指逻辑问题，不同于大多数编程语言，`SQL`语言则采用一种特别的逻辑体系——三值逻辑，即逻辑真值除了真和假，还有第三个值“不确定”。三值逻辑经常会带来一些想象不到的情况，致使`SQL`的查询结果与预期不一致。在对于`null`上应使用`is null`作为判断条件，例句：
+
+```sql
+select * from class_a where age < all (
+	select age from class_b where city = 'tokyo'
+);
+```
+
+这条语句在`class_b`表中不存在`age`为`null`的字段时，查询返回的数据是正常的。当`age`中存在`null`值时，是查询不到任何数据记录的。在这种情况下，可以使用极值函数在统计时把为`null`的数据排除过滤掉。解决`null`带来的各种问题，最佳方法应该是往表里添加`not null`约束来尽力排除`null`：
+
+```sql
+select * from class_a where age < all (
+	select MIN(age) from class_b where city = 'tokyo'
+);
+```
+
