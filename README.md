@@ -167,3 +167,51 @@ select * from class_a where age < all (
 );
 ```
 
+### 3.HAVING子句的力量
+> `Having`子句是`SQL`里一个非常重要的功能，但其价值并没有被人们深刻地认识。另外，它还是理解`SQL`面向集合这一本质的关键，应用范围非常广泛。在学习`Having`子句的用法时，进而理解面向集合语言的第二个特性——以集合为单位进行操作。 
+
+在正常的思维逻辑中，`having`子句通常是`group by`分组语句一起使用的。按照现在的`SQL`标准来说，`having`子句是可以单独使用的，可以认为是对空字段进行了`group by`的操作，只不过省略了`group by`子句。
+
+用`having`子句进行子查询—求众数，若存在毕业生表`graduates`中存在`name`、`income`字段表示毕业生的工作收入，现需找出年薪资在哪个值的学生最多：
+
+```sql
+select income, count(*) as cnt
+	from graduates group by income
+	having count(*) >= all (select count(*) from graduates group by income);
+```
+
+通过对`income`进行分组，可以分组得到"20000"的有2个人（`jane`和`diana`）。在`all`函数中会出现所有分组，上面的`sql`语句是找出`income`人数最多的分组。
+
+另外一个常见需求是求中位数，它指的是将集合中元素按升序排列后恰好位于正中间的元素。如果集合的元素个数为偶数，则取中间两个元素的平均值作为中位数。其`sql`的编写思路是：将集合里的元素按照大小分为上半部分和下半部分两个子集，同时让这2个子集共同拥有集合正中间的元素。这样，共同部分的元素的平均值就是中位数：
+
+```sql
+select avg(distinct income) from (
+	select t1.income from graduates t1, graduates t2 group by t1.income
+    	having sum(case when t2.income >= t1.income then 1 else 0 end) >= count(*)/2
+    	and sum(case when t2.income <1 t1.income then 1 else 0 end) >= count(*)/2
+) tmp;
+```
+
+查询不包含`null`的集合，`count`函数的使用方法有`count(*)`和`count(column_name)`两种，它们之间的区别：第一是性能上的区别，第二个是`count(*)`可以用于`null`，而`count(column)`与其它聚合函数一样，要先排除掉`null`的行再进行统计。另一种理解方式：`count(*)`查询的是所有行的数目，而`count(column)`查询的规则不一定是这样。下面的`sql`用于统计出所有作业已经上交的`dept`名称：
+
+```sql
+select dpt from students group by dpt having count(*) = count(abmt_date);
+```
+
+用关系除法运算进行购物篮分析，有商品表`items`、商店商品表`shopitem`，求包含所有商品的商店：
+
+```sql
+select si.shop from shopitem si, items i 
+	where si.item = i.item group by si.shop
+	having count(si.item) = (select count(item) from items)
+```
+
+若要进行“精确关系除法”，即只选择没有剩余商品的店铺（与此相对，前一个问题被称为“带余除法”）。解决这个问题需要使用外连接：
+
+```sql
+select si.shop 
+	from shopitems si left outer join items i on si.item = i.item
+	group by si.shop
+	having count(si.item) = (select count(item) from items)
+		and count(i.item) = (select count(item) from items);
+```
