@@ -86,7 +86,7 @@ select std_id,
 	from StudentClub group by std_id;
 ```
 
-### 2.自连接的用法
+### 2. 自连接的用法
 >`SQL`通常在不同的表或者视图间进行连接运算，但是也可以对相同的表进行”自连接“运算。自连接的处理过程不太容易想象，因此人们常常对其敬而远之。但是，如果能够熟练掌握，就会发现它是非常方便的技术。
 
 | name（商品名称） | price（商品价格）     |
@@ -167,7 +167,7 @@ select * from class_a where age < all (
 );
 ```
 
-### 3.HAVING子句的力量
+### 3. HAVING子句的力量
 > `Having`子句是`SQL`里一个非常重要的功能，但其价值并没有被人们深刻地认识。另外，它还是理解`SQL`面向集合这一本质的关键，应用范围非常广泛。在学习`Having`子句的用法时，进而理解面向集合语言的第二个特性——以集合为单位进行操作。 
 
 在正常的思维逻辑中，`having`子句通常是`group by`分组语句一起使用的。按照现在的`SQL`标准来说，`having`子句是可以单独使用的，可以认为是对空字段进行了`group by`的操作，只不过省略了`group by`子句。
@@ -208,10 +208,65 @@ select si.shop from shopitem si, items i
 
 若要进行“精确关系除法”，即只选择没有剩余商品的店铺（与此相对，前一个问题被称为“带余除法”）。解决这个问题需要使用外连接：
 
-```sql
+``` sql
 select si.shop 
 	from shopitems si left outer join items i on si.item = i.item
 	group by si.shop
 	having count(si.item) = (select count(item) from items)
 		and count(i.item) = (select count(item) from items);
 ```
+
+### 4. 外连接的用法
+
+> 数据库工程师经常面对的一个难题是无法将`SQL`语句的执行结果转换为想要的格式，因为`SQL`语言本来就不是为了这个目的而出现的，所以需要费些功夫。将通过格式转换中具有代表性的行列转换和嵌套式侧栏的生成方式，深入理解在其中起着重要作用的外连接。
+
+用外连接进行行列转换（行`->`列），用于制作交叉表。现有课程表`courses`包含`name`（员工姓名）和`course`（课程）两列，表数据为学生及所选课程（同一学生选多门课）。现对表中数据进行格式转换，竖列为学生姓名，横列为所有选择课程：
+
+```sql
+select c.name
+	case when c1.name is not null then 'true' else 'false' end as 'sql',
+	case when c2.name is not null then 'true' else 'false' end as 'unix',
+    case when c3.name is not null then 'true' else 'false' end as 'java'
+	from (select distinct name from course) c0
+	left outer join
+		(select name from courses where course = 'sql') c1 
+		on c0.name = c1.name
+			left outer join
+				(select name from courses where course = 'unix') c2
+					on co.name = c2.name
+						left outer join
+							(select name from courses where course = 'java') c3
+								on c0.name = c3.name;
+```
+
+这种写法具有比较直观和易于理解的优点，但是因为大量用到了内嵌视图和连接操作，代码会显得很臃肿。而且，随着表头列数的增加，性能也会恶化。有一种更好的做法，外连接可以使用标量子查询替代：
+
+```sql
+select c0.name,
+	(select 'true' from courses c1 
+     	where course = 'sql' and c1.name = c0.name) as 'sql',
+	(select 'true' from courses c2 
+     	where course = 'unix' and c2.name = c0.name) as 'unix',
+	(select 'true' from courses c3 
+     	where course = 'java' and c3.name = co.name) as 'java'
+	from (select distinct name from courses) c0;
+```
+
+这里的要点在于使用标量子查询来生成`3`列表头，最后一行`from`子句的集合`c0`和前面的"员工主表"一样，标量子查询的条件和外连接一样。这种做法的优点在于，需要增加或减少课程时，只修改`select`子句即可，代码修改起来比较简单。
+
+用外连接进行行列转换（列`->`行），汇总重复项于一列。现有员工子女信息表`personnel`，第一列`employee`表示员工，`child_1`、`child_2`、`child_3`列为员工的孩子，若员工有多个孩子。现进行行列转换，新表结构存在两列，第一列表示`employee`，第二列表示`child`（若该员工有2个孩子，则共存在两行数据）：
+
+```sql
+create view children(child) as select child_1 from personnel
+union select child_2 from personnel
+union select child_3 from personnel;
+```
+
+然后根据新生成的员工子女表进行主表关联，重点在于连接谓词是通过`in`进行指定的：
+
+```sql
+select emp.employee, children.child from personnel emp
+	left outer join children 
+	on children.child in (emp.child_1, emp.child_2, emp.child3);	
+```
+
