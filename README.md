@@ -270,3 +270,31 @@ select emp.employee, children.child from personnel emp
 	on children.child in (emp.child_1, emp.child_2, emp.child3);	
 ```
 
+在交叉表里制作嵌套式表侧栏，有年龄层级主表`table_age`、性别主表`table_sex`、人口分布表`table_pop`，需要将这`3`张表汇总生成侧栏的统计表。要求内容：第一列`age_class`为年龄范围、第二列`sex_cd`为性别统计、第三列`pop_tohoku`为东北地区人口、第四列`pop_kanto`为关东地区人口：
+
+```sql
+select master.age_class as age_class, 
+	master.sex_cd as sex_cd,
+	master.pop_tohoku as pop_tohoku,
+	master.pop_kanto as pop_kanto
+from (select age_class, sex_cd from table_age cross join table_sex) master
+	left outer join
+		(select age_class, sex_cd,
+         	sum(case when pref_name in ('青森', '秋田') then population else null end) as pop_tohoku,
+         	sum(case when pref_name in ('东京', '千叶') then population else null end) as pop_kanto,
+         from table_pop group by age_class, sex_cd) data
+         on master.age_class = data.age_class and master.sex_cd = data.sex_cd;
+```
+
+上述`sql`只对`master`进行了一次外连接操作，需要生成嵌套式表侧栏时，事先按照需要的格式准备好主表就可以。当需要`3`层或`3`层以上的嵌套式表侧栏时，也可以按照这种方法进行扩展。对于不支持`cross join`语句的数据库，可以像`from table_age, table_sex`这样不指定链接条件，把需要连接的表写在一起。
+
+作为乘法运算的连接，现有商品表`items`、销售历史表`sales_history`，现需要以商品为单位汇总出各自的销量。第一列为`item_no`商品编号、第二列为`total_qty`总销量。下面这种做法代码更简洁，而且没有使用临时视图，所以性能也会有所改善：
+
+```sql
+select i.item_no, sum(sh.quantity) as total_qty
+	from items i left outer join sales_history sh 
+		on i.item_no = sh.item_no 
+group by i.item_no;
+```
+
+`sql`中的全外连接（`full join`）就是"保留全部信息"的意思，若所使用的数据库不支持全外连接，可以分别进行左外连接和右外连接，再把两个结果通过`union`合并起来，也能达到同样的目的。
